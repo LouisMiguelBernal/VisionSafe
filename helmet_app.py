@@ -35,14 +35,17 @@ elif mode == "🎥 Real-Time Webcam":
     st.write("⚡ Turn on your camera for real-time helmet detection.")
 
     class VideoTransformer(VideoTransformerBase):
-        def transform(self, frame):
-            img = frame.to_ndarray(format="bgr24")
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")
 
-            # Run YOLO inference
-            results = model(img)
-            detected_img = results[0].plot()
+        # Run YOLO inference
+        results = model(img)
+        detected_img = results[0].plot()
 
-            return detected_img
+        # Convert back to numpy array (ensuring dtype is uint8)
+        detected_img = np.array(detected_img, dtype=np.uint8)
+
+        return detected_img
 
     webrtc_streamer(
         key="helmet-detection",
