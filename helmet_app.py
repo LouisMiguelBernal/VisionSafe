@@ -27,7 +27,7 @@ if mode == "📸 Image Detection":
         results = model(image)
         detected_img = results[0].plot()  # Draw detected boxes
 
-        # Convert to RGB for Streamlit
+        # Convert to OpenCV BGR format
         detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
 
         # Display the results
@@ -57,9 +57,10 @@ elif mode == "🎥 Real-Time Webcam":
                 st.error(f"Error processing frame: {e}")
                 return img  # Return original frame if error occurs
 
+    # 🔥 Fix WebRTC Device Selection 🔥
     webrtc_streamer(
         key="helmet-detection",
         video_transformer_factory=VideoTransformer,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Fix WebRTC connection
-        media_stream_constraints={"video": True, "audio": False},  # Only video
+        media_stream_constraints={"video": {"facingMode": "user"}, "audio": False},  # Force webcam selection
     )
