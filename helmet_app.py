@@ -27,7 +27,7 @@ if mode == "📸 Image Detection":
         detected_img = results[0].plot()
 
         # Convert to OpenCV BGR format
-        detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
+        detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
         # Display the results
         st.image(detected_img, caption="Detected Image", use_column_width=True)
@@ -43,30 +43,32 @@ elif mode == "🎥 Real-Time Webcam":
         def transform(self, frame):
             img = frame.to_ndarray(format="bgr24")
 
-            try:
-                # Debug print
-                print(f"Frame Shape: {img.shape}")
+            # 🛠 Debug: Check if frames are received
+            print(f"Frame received: {img.shape}")
 
+            try:
                 # Run YOLO inference
                 results = self.model(img)
+
+                # 🛠 Debug: Check if detections exist
+                if len(results[0].boxes) == 0:
+                    print("No objects detected, returning original frame.")
+                    return img  # Return original frame if nothing detected
+
                 detected_img = results[0].plot()
 
-                # If no detections, return original image
-                if detected_img is None:
-                    print("No detections, returning original frame.")
-                    return img
-
-                detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
+                # Convert back to numpy array (ensuring dtype is uint8)
+                detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
                 return detected_img
             except Exception as e:
                 print(f"Error processing frame: {e}")
                 return img  # Return original frame if error
 
-    # 🔥 Fix WebRTC Auto Camera Selection & Resolution
+    # 🔥 Fix WebRTC Camera Selection & Lower Resolution to 640x480
     webrtc_streamer(
         key="helmet-detection",
         video_transformer_factory=VideoTransformer,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        media_stream_constraints={"video": {"width": 1280, "height": 720, "facingMode": "user"}, "audio": False},
+        media_stream_constraints={"video": {"width": 640, "height": 480, "facingMode": "user"}, "audio": False},
     )
