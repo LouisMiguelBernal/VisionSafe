@@ -32,27 +32,32 @@ if mode == "📸 Image Detection":
 # Real-Time Webcam Mode
 elif mode == "🎥 Real-Time Webcam":
     st.write("⚡ Turn on your camera for real-time helmet detection.")
-    run_webcam = st.checkbox("Start Webcam")
 
-    if run_webcam:
-        cap = cv2.VideoCapture(0)  # Open webcam
-        stframe = st.empty()  # Placeholder for live stream
+    if not hasattr(cv2, "VideoCapture"):
+        st.error("Webcam access is not supported in this environment.")
+    else:
+        run_webcam = st.checkbox("Start Webcam")
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to capture video.")
-                break
+        if run_webcam:
+            cap = cv2.VideoCapture(0)
+            stframe = st.empty()
 
-            # Run YOLO inference
-            results = model(frame)
-            detected_img = results[0].plot()
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    st.error("Failed to capture video.")
+                    break
 
-            # Convert to RGB for Streamlit
-            detected_img = cv2.cvtColor(detected_img, cv2.COLOR_BGR2RGB)
+                # Run YOLO inference
+                results = model(frame)
+                detected_img = results[0].plot()
 
-            # Display the video stream
-            stframe.image(detected_img, channels="RGB", use_column_width=True)
+                # Convert to RGB for Streamlit
+                detected_img = cv2.cvtColor(detected_img, cv2.COLOR_BGR2RGB)
 
-        cap.release()
-        cv2.destroyAllWindows()
+                # Display the video stream
+                stframe.image(detected_img, channels="RGB", use_column_width=True)
+
+            cap.release()
+
+        
