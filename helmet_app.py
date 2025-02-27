@@ -44,20 +44,29 @@ elif mode == "🎥 Real-Time Webcam":
             img = frame.to_ndarray(format="bgr24")
 
             try:
+                # Debug print
+                print(f"Frame Shape: {img.shape}")
+
+                # Run YOLO inference
                 results = self.model(img)
                 detected_img = results[0].plot()
 
+                # If no detections, return original image
+                if detected_img is None:
+                    print("No detections, returning original frame.")
+                    return img
+
                 detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
-                
+
                 return detected_img
             except Exception as e:
-                st.error(f"Error processing frame: {e}")
-                return img
+                print(f"Error processing frame: {e}")
+                return img  # Return original frame if error
 
-    # 🔥 Fix WebRTC Auto Camera Selection
+    # 🔥 Fix WebRTC Auto Camera Selection & Resolution
     webrtc_streamer(
         key="helmet-detection",
         video_transformer_factory=VideoTransformer,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        media_stream_constraints={"video": {"facingMode": "user"}, "audio": False},
+        media_stream_constraints={"video": {"width": 1280, "height": 720, "facingMode": "user"}, "audio": False},
     )
