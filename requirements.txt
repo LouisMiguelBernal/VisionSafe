@@ -3,3 +3,4 @@ pillow
 streamlit
 opencv-python-headless
 ultralytics
+streamlit-webrtc
