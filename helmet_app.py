@@ -14,7 +14,7 @@ st.title("🛵 Helmet Detection System")
 # Sidebar menu
 mode = st.sidebar.radio("Choose mode", ["📸 Image Detection", "🎥 Real-Time Webcam"])
 
-# Image Upload Mode
+# 📸 Image Upload Mode
 if mode == "📸 Image Detection":
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
     
@@ -27,25 +27,32 @@ if mode == "📸 Image Detection":
         results = model(image)
         detected_img = results[0].plot()  # Draw detected boxes
 
+        # Convert to RGB for Streamlit
+        detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
+
         # Display the results
         st.image(detected_img, caption="Detected Image", use_column_width=True)
 
-# Real-Time Webcam Mode using WebRTC
+# 🎥 Real-Time Webcam Mode using WebRTC
 elif mode == "🎥 Real-Time Webcam":
     st.write("⚡ Turn on your camera for real-time helmet detection.")
 
     class VideoTransformer(VideoTransformerBase):
-    def transform(self, frame):
-        img = frame.to_ndarray(format="bgr24")
+        def transform(self, frame):
+            img = frame.to_ndarray(format="bgr24")
 
-        # Run YOLO inference
-        results = model(img)
-        detected_img = results[0].plot()
+            try:
+                # Run YOLO inference
+                results = model(img)
+                detected_img = results[0].plot()
 
-        # Convert back to numpy array (ensuring dtype is uint8)
-        detected_img = np.array(detected_img, dtype=np.uint8)
-
-        return detected_img
+                # Convert to OpenCV BGR format
+                detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
+                
+                return detected_img
+            except Exception as e:
+                st.error(f"Error processing frame: {e}")
+                return img  # Return original frame if error occurs
 
     webrtc_streamer(
         key="helmet-detection",
