@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from PIL import Image
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 # Load YOLO model
 model = YOLO("helmet_detector.pt")
@@ -29,35 +30,21 @@ if mode == "📸 Image Detection":
         # Display the results
         st.image(detected_img, caption="Detected Image", use_column_width=True)
 
-# Real-Time Webcam Mode
+# Real-Time Webcam Mode using WebRTC
 elif mode == "🎥 Real-Time Webcam":
     st.write("⚡ Turn on your camera for real-time helmet detection.")
 
-    if not hasattr(cv2, "VideoCapture"):
-        st.error("Webcam access is not supported in this environment.")
-    else:
-        run_webcam = st.checkbox("Start Webcam")
+    class VideoTransformer(VideoTransformerBase):
+        def transform(self, frame):
+            img = frame.to_ndarray(format="bgr24")
 
-        if run_webcam:
-            cap = cv2.VideoCapture(0)
-            stframe = st.empty()
+            # Run YOLO inference
+            results = model(img)
+            detected_img = results[0].plot()
 
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Failed to capture video.")
-                    break
+            return detected_img
 
-                # Run YOLO inference
-                results = model(frame)
-                detected_img = results[0].plot()
-
-                # Convert to RGB for Streamlit
-                detected_img = cv2.cvtColor(detected_img, cv2.COLOR_BGR2RGB)
-
-                # Display the video stream
-                stframe.image(detected_img, channels="RGB", use_column_width=True)
-
-            cap.release()
-
-        
+    webrtc_streamer(
+        key="helmet-detection",
+        video_transformer_factory=VideoTransformer
+    )
