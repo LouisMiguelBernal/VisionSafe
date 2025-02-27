@@ -38,12 +38,15 @@ elif mode == "🎥 Real-Time Webcam":
     st.write("⚡ Turn on your camera for real-time helmet detection.")
 
     class VideoTransformer(VideoTransformerBase):
+        def __init__(self):
+            self.model = model  # Load model once
+
         def transform(self, frame):
             img = frame.to_ndarray(format="bgr24")
 
             try:
                 # Run YOLO inference
-                results = model(img)
+                results = self.model(img)
                 detected_img = results[0].plot()
 
                 # Convert to OpenCV BGR format
@@ -56,5 +59,7 @@ elif mode == "🎥 Real-Time Webcam":
 
     webrtc_streamer(
         key="helmet-detection",
-        video_transformer_factory=VideoTransformer
+        video_transformer_factory=VideoTransformer,
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Fix WebRTC connection
+        media_stream_constraints={"video": True, "audio": False},  # Only video
     )
