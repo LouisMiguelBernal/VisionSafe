@@ -19,13 +19,12 @@ if mode == "📸 Image Detection":
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
     
     if uploaded_file:
-        # Convert file to OpenCV format
         image = Image.open(uploaded_file)
         image = np.array(image)
 
         # Run YOLO inference
         results = model(image)
-        detected_img = results[0].plot()  # Draw detected boxes
+        detected_img = results[0].plot()
 
         # Convert to OpenCV BGR format
         detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
@@ -45,22 +44,20 @@ elif mode == "🎥 Real-Time Webcam":
             img = frame.to_ndarray(format="bgr24")
 
             try:
-                # Run YOLO inference
                 results = self.model(img)
                 detected_img = results[0].plot()
 
-                # Convert to OpenCV BGR format
                 detected_img = cv2.cvtColor(np.array(detected_img), cv2.COLOR_RGB2BGR)
                 
                 return detected_img
             except Exception as e:
                 st.error(f"Error processing frame: {e}")
-                return img  # Return original frame if error occurs
+                return img
 
-    # 🔥 Fix WebRTC Device Selection 🔥
+    # 🔥 Fix WebRTC Auto Camera Selection
     webrtc_streamer(
         key="helmet-detection",
         video_transformer_factory=VideoTransformer,
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Fix WebRTC connection
-        media_stream_constraints={"video": {"facingMode": "user"}, "audio": False},  # Force webcam selection
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        media_stream_constraints={"video": {"facingMode": "user"}, "audio": False},
     )
