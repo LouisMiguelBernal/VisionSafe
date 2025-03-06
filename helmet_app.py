@@ -30,7 +30,7 @@ if mode == "📸 Image Detection":
         detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
         # Display the results
-        st.image(detected_img, caption="Detected Image", use_column_width=True)
+        st.image(detected_img, caption="Detected Image", use_container_width=True)
 
 # 🎥 Real-Time Webcam Mode using WebRTC
 elif mode == "🎥 Real-Time Webcam":
