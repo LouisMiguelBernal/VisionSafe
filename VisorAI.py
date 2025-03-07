@@ -11,7 +11,7 @@ import base64
 import tempfile
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-st.set_page_config(page_title="XGE", layout="wide", page_icon='assets/icon.png')
+st.set_page_config(page_title="VisorAI", layout="wide", page_icon='assets/icon.png')
 
 # Function to convert image to base64
 def get_base64_image(image_path):
@@ -121,9 +121,6 @@ with detect:
         cap.release()
         cv2.destroyAllWindows()
 
-    # Default video file path
-    default_video_path = "assets/vid.mp4"  # Ensure this file exists in the same directory as the script
-
     # Main UI logic
     if uploaded_file:
         file_type = uploaded_file.type.split("/")[0]
@@ -143,12 +140,8 @@ with detect:
                 process_video(temp_file_path)
 
             os.remove(temp_file_path)  # Cleanup temporary file after processing
-
-    # If no file is uploaded, play the default video
-    elif os.path.exists(default_video_path):
-        st.video(default_video_path)
     else:
-        st.warning("No video uploaded, and default video file is missing!")
+       st.video("assets/vid.mp4")
 
 footer = f"""
 <hr>
