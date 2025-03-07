@@ -73,75 +73,83 @@ st.markdown("""
     }                
     </style>
     """, unsafe_allow_html=True)
-
-# Load YOLO model
-model = YOLO("helmet_detector.pt")
-
-# Sidebar for file upload
-uploaded_file = st.sidebar.file_uploader("Simulate & Detect", type=["jpg", "jpeg", "png", "mp4", "avi", "mov"])
-
 # Main detection UI
 detect, model_info = st.tabs(['Detection', 'Model Information'])
 
 with detect:
-    # Placeholder for clearing content
-    stframe = st.empty()  
+    # Cache model loading for efficiency
+    @st.cache_resource
+    def load_model():
+        return YOLO("helmet_detector.pt")  # Load YOLO model
 
-    if uploaded_file is None:
-        # Show title and default video when no file is uploaded
-        st.markdown("<h1>Vision Meets<span style='color:#4CAF50;'> SAFETY</span></h1>", unsafe_allow_html=True)
-        st.video("assets/vid.mp4")
+    model = load_model()  # Load the model once
 
-    else:
-        # Clear previous content
-        stframe.empty()
+    # Sidebar file upload
+    uploaded_file = st.sidebar.file_uploader("Upload Image/Video", type=["jpg", "jpeg", "png", "mp4", "avi", "mov"])
 
-        file_type = uploaded_file.type.split("/")[0]  # Get file type (image/video)
+    # Processing function for images
+    def process_image(image):
+        image = np.array(image)  # Convert to NumPy array
+        results = model(image, verbose=False)  # Run YOLO inference
+        detected_img = results[0].plot(conf=True)  # Draw detections
+        detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)  # Convert to BGR for OpenCV
+        return detected_img
+
+    # Processing function for videos (Optimized)
+    def process_video(video_path):
+        cap = cv2.VideoCapture(video_path)
+        stframe = st.empty()  # Streamlit frame for video display
+        
+        # Get video properties
+        frame_rate = int(cap.get(cv2.CAP_PROP_FPS))  # Frames per second
+        skip_frames = 1  
+
+        while cap.isOpened():
+            for _ in range(skip_frames):
+                cap.read()  # Skip frames to speed up processing
+
+            ret, frame = cap.read()
+            if not ret:
+                break  # Exit when video ends
+
+            results = model(frame, verbose=False)  # Run YOLO detection
+            detected_frame = results[0].plot(conf=True)  # Draw detections
+            detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+
+            stframe.image(detected_frame, channels="BGR", use_container_width=True)
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+    # Default video file path
+    default_video_path = "assets/vid.mp4"  # Ensure this file exists in the same directory as the script
+
+    # Main UI logic
+    if uploaded_file:
+        file_type = uploaded_file.type.split("/")[0]
 
         if file_type == "image":
             image = Image.open(uploaded_file)
-            image = np.array(image)
-
             with st.spinner("Processing image..."):
-                results = model(image, verbose=False)  # Run YOLO inference
-                detected_img = results[0].plot(conf=True)
-                detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
-
-            stframe.image(detected_img, caption="Detected Image", use_container_width=True)
+                detected_img = process_image(image)
+            st.image(detected_img, caption="Detected Image", use_container_width=True)
 
         elif file_type == "video":
-            # Save video to a temporary file
-            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-            tfile.write(uploaded_file.read())
-            tfile.close()  # Ensure the file is closed before opening
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
+                temp_file.write(uploaded_file.read())
+                temp_file_path = temp_file.name
 
-            # Open video file
-            cap = cv2.VideoCapture(tfile.name)
-            stframe = st.empty()
+            with st.spinner("Processing video..."):
+                process_video(temp_file_path)
 
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break  # Exit loop when video ends
+            os.remove(temp_file_path)  # Cleanup temporary file after processing
 
-                # Run YOLO on frame
-                results = model(frame, verbose=False)
-                detected_frame = results[0].plot(conf=True)
+    # If no file is uploaded, play the default video
+    elif os.path.exists(default_video_path):
+        st.video(default_video_path)
+    else:
+        st.warning("No video uploaded, and default video file is missing!")
 
-                # Convert frame color format
-                detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
-
-                # Display video frame
-                stframe.image(detected_frame, channels="BGR", use_container_width=True)
-
-            # Clean up resources
-            cap.release()
-            cv2.destroyAllWindows()
-
-            # Ensure Windows releases the file before deleting
-            time.sleep(1)  
-            os.remove(tfile.name)
-            
 footer = f"""
 <hr>
 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 10px 0;">
