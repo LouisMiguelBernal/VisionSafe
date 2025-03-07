@@ -90,7 +90,7 @@ with detect:
     if uploaded_file is None:
         # Show title and default video when no file is uploaded
         st.markdown("<h1>Vision Meets<span style='color:#4CAF50;'> SAFETY</span></h1>", unsafe_allow_html=True)
-        st.video("assets/vid.mp4")  # Keep default video
+        st.video("assets/vid.mp4")
 
     else:
         # Clear previous content
@@ -110,9 +110,6 @@ with detect:
             stframe.image(detected_img, caption="Detected Image", use_container_width=True)
 
         elif file_type == "video":
-            # Ensure default video is removed before processing
-            stframe.empty()
-
             # Save video to a temporary file
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
             tfile.write(uploaded_file.read())
@@ -122,35 +119,29 @@ with detect:
             cap = cv2.VideoCapture(tfile.name)
             stframe = st.empty()
 
-            frame_skip = 2  # Skip every other frame to improve performance
-
             while cap.isOpened():
-                for _ in range(frame_skip):  # Skip frames to reduce processing load
-                    ret, frame = cap.read()
-                    if not ret:
-                        break  # Exit loop when video ends
+                ret, frame = cap.read()
+                if not ret:
+                    break  # Exit loop when video ends
 
-                if ret:
-                    # Run YOLO on frame
-                    results = model(frame, verbose=False)
-                    detected_frame = results[0].plot(conf=True)
+                # Run YOLO on frame
+                results = model(frame, verbose=False)
+                detected_frame = results[0].plot(conf=True)
 
-                    # Convert frame color format
-                    detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+                # Convert frame color format
+                detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
-                    # Display video frame
-                    stframe.image(detected_frame, channels="BGR", use_container_width=True)
+                # Display video frame
+                stframe.image(detected_frame, channels="BGR", use_container_width=True)
 
             # Clean up resources
             cap.release()
             cv2.destroyAllWindows()
 
             # Ensure Windows releases the file before deleting
-            time.sleep(1)  # Short delay before deletion
+            time.sleep(1)  
             os.remove(tfile.name)
-
-
-
+            
 footer = f"""
 <hr>
 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 10px 0;">
