@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import streamlit as st
 import tempfile
 import cv2
