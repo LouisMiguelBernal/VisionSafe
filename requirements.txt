@@ -1,6 +1,6 @@
-numpy
-pillow
 streamlit
-opencv-python-headless
+opencv-python
+numpy
+pygame
+pillow
 ultralytics
-streamlit-webrtc
