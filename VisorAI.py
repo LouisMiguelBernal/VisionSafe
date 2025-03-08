@@ -2,25 +2,19 @@ import streamlit as st
 import tempfile
 import cv2
 import numpy as np
-import pygame
 from PIL import Image
 from ultralytics import YOLO
 import os
 import warnings
 import base64
 import time
+import threading
 
+# Suppress warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
-st.set_page_config(page_title="VisorAI", layout="wide", page_icon='assets/icon.png')
 
-# Initialize pygame for playing sound
-pygame.mixer.init()
-helmet_sound = "assets/helmet_detected.mp3"  # Path to the alert sound file
-
-def play_sound():
-    if not pygame.mixer.music.get_busy():  # Only play if no sound is currently playing
-        pygame.mixer.music.load(helmet_sound)
-        pygame.mixer.music.play()
+# Set Streamlit page config
+st.set_page_config(page_title="VisorAI", layout="wide", page_icon="assets/icon.png")
 
 # Function to convert image to base64
 def get_base64_image(image_path):
@@ -59,55 +53,71 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Load YOLO Model
+# Global variable to track last sound play time
+last_play_time = 0  
+
+# Function to play sound with a delay
+def play_sound():
+    global last_play_time
+    current_time = time.time()
+
+    # Play sound only if 3 seconds have passed since the last sound
+    if current_time - last_play_time >= 3:
+        audio_file = "assets/helmet_detected.mp3"
+        if os.path.exists(audio_file):
+            with open(audio_file, "rb") as f:
+                audio_bytes = f.read()
+            audio_base64 = base64.b64encode(audio_bytes).decode()
+
+            audio_html = f"""
+            <audio autoplay>
+                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+            </audio>
+            """
+            st.markdown(audio_html, unsafe_allow_html=True)
+
+            # Update last play time
+            last_play_time = current_time
+
 @st.cache_resource
 def load_model():
-    return YOLO("helmet_detector.pt")  # Load YOLO model once
+    return YOLO("helmet_detector.pt")
 
 model = load_model()
 
-# Detection UI
-detect, model_info = st.tabs(['Detection', 'Model Information'])
+detect, model_info = st.tabs(["Detection", "Model Information"])
 
-# Function to check for helmet detections and play sound per frame (only if not playing)
-def check_new_helmet_detections(results):
-    helmet_detected = False  # Track if at least one helmet is detected in the frame
+# Function to check for helmet detections and play sound at set intervals
+def check_helmet_detections(results):
+    detected_helmets = sum(
+        1 for detection in results[0].boxes if detection.conf[0].item() > 0.5
+    )
 
-    for detection in results[0].boxes:
-        class_id = int(detection.cls[0])  # Class ID of detected object
-        confidence = detection.conf[0].item()  # Confidence score
-        
-        if confidence > 0.5:  # Adjust confidence threshold as needed
-            helmet_detected = True
-            break  # No need to check further; at least one helmet is detected
+    if detected_helmets > 0:
+        play_sound()  # Play sound with cooldown
 
-    if helmet_detected:
-        play_sound()  # Play sound only if not currently playing
-
-# Function to process images
+# Function to process image
 def process_image(image):
-    image = np.array(image)  # Convert to NumPy array
-    results = model(image, verbose=False)  # Run YOLO inference
+    image = np.array(image)
+    results = model(image, verbose=False)
+    check_helmet_detections(results)
+    detected_img = results[0].plot(conf=True)
+    return cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
-    check_new_helmet_detections(results)  # Check for new detections
-
-    detected_img = results[0].plot(conf=True)  # Draw detections
-    detected_img = cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)  # Convert to BGR
-    return detected_img
-
+# Function to process video
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
-    stframe = st.empty()  # Streamlit frame for video display
+    stframe = st.empty()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            break  # Exit when video ends
+            break
 
-        results = model(frame, verbose=False)  # Run YOLO detection
-        check_new_helmet_detections(results)  # Check for detections in the current frame
+        results = model(frame, verbose=False)
+        check_helmet_detections(results)  # Play sound at intervals (not every frame)
 
-        detected_frame = results[0].plot(conf=True)  # Draw detections
+        detected_frame = results[0].plot(conf=True)
         detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
 
         stframe.image(detected_frame, channels="BGR", use_container_width=True)
@@ -115,10 +125,9 @@ def process_video(video_path):
     cap.release()
     cv2.destroyAllWindows()
 
-# Sidebar file upload
+# File uploader
 uploaded_file = st.sidebar.file_uploader("Upload Image/Video", type=["jpg", "jpeg", "png", "mp4", "avi", "mov"])
 
-# Main UI logic
 with detect:
     if uploaded_file:
         file_type = uploaded_file.type.split("/")[0]
@@ -137,9 +146,9 @@ with detect:
             with st.spinner("Processing video..."):
                 process_video(temp_file_path)
 
-            os.remove(temp_file_path)  # Cleanup temporary file
+            os.remove(temp_file_path)
     else:
-        st.video("assets/vid.mp4")  # Default video
+        st.video("assets/vid.mp4")
 
 # Footer Section
 footer = f"""
