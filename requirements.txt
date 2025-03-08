@@ -3,5 +3,4 @@ opencv-python
 numpy
 pygame
 pillow
-threading
 ultralytics
