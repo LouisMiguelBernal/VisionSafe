@@ -1,6 +1,15 @@
+<<<<<<< HEAD
 streamlit
 opencv-python-headless
 numpy
 pygame
 pillow
 ultralytics
+=======
+streamlit
+opencv-python-headless
+numpy
+pygame
+pillow
+ultralytics
+>>>>>>> ec76a38 (Initial commit with visor.pt)
