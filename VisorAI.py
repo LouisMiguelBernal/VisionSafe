@@ -244,7 +244,6 @@ footer = f"""
 
 # Display footer
 st.markdown(footer, unsafe_allow_html=True)
-=======
 import streamlit as st
 import tempfile
 import cv2
