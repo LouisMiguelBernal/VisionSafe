@@ -53,59 +53,121 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Global variable to track last sound play time
-last_play_time = 0  
+# Initialize session state for tracking sound and uploads
+if "last_play_time" not in st.session_state:
+    st.session_state.last_play_time = 0
+if "last_detected_classes" not in st.session_state:
+    st.session_state.last_detected_classes = set()
+if "last_upload_time" not in st.session_state:
+    st.session_state.last_upload_time = 0
 
-# Function to play sound with a delay
-def play_sound():
-    global last_play_time
+# Sound mapping
+SOUND_FILES = {
+    "Child-Pedestrian Crossing": "assets/child_pedestrian_crossing.mp3",
+    "Give Way": "assets/give_way.mp3",
+    "Speed Limit": "assets/speed_limit.mp3",
+    "Stop": "assets/stop.mp3",
+}
+
+def generate_audio_js(audio_file):
+    """Generate JavaScript to force autoplay audio."""
+    if not os.path.exists(audio_file):
+        return ""
+
+    # Convert audio to base64
+    with open(audio_file, "rb") as f:
+        audio_bytes = f.read()
+    audio_base64 = base64.b64encode(audio_bytes).decode()
+
+    return f"""
+    <script>
+        var audio = new Audio("data:audio/mp3;base64,{audio_base64}");
+        audio.play().catch(error => console.log("Autoplay failed:", error));
+    </script>
+    """
+
+def play_sound(class_name):
+    """Triggers JavaScript-based audio playback."""
+    audio_file = SOUND_FILES.get(class_name)
+    if not audio_file:
+        return  
+
+    # Prevent sound spam (minimum delay 1.5s)
     current_time = time.time()
+    if current_time - st.session_state.last_play_time < 1.5:
+        return  
 
-    # Play sound only if 3 seconds have passed since the last sound
-    if current_time - last_play_time >= 3:
-        audio_file = "assets/helmet_detected.mp3"
-        if os.path.exists(audio_file):
-            with open(audio_file, "rb") as f:
-                audio_bytes = f.read()
-            audio_base64 = base64.b64encode(audio_bytes).decode()
+    st.session_state.last_play_time = current_time
+    print(f"🔊 Playing sound for: {class_name}")
 
-            audio_html = f"""
-            <audio autoplay>
-                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
-            </audio>
-            """
-            st.markdown(audio_html, unsafe_allow_html=True)
+    # Inject JavaScript to play sound
+    audio_js = generate_audio_js(audio_file)
+    st.components.v1.html(audio_js, height=0)
 
-            # Update last play time
-            last_play_time = current_time
+def new_upload_detected():
+    """Detects if a new file was uploaded and triggers sound."""
+    current_time = time.time()
+    if current_time - st.session_state.last_upload_time >= 0.5:
+        st.session_state.last_upload_time = current_time
+        return True
+    return False
 
+# Load YOLO model
 @st.cache_resource
 def load_model():
-    return YOLO("helmet_detector.pt")
+    model_path = "assets/visor.pt"
+    if not os.path.exists(model_path):
+        st.error(f"❌ Model file not found: {model_path}")
+        return None
+    print("✅ YOLO Model Loaded")
+    return YOLO(model_path)
 
 model = load_model()
+if model is None:
+    st.stop()
 
+# Streamlit UI Tabs
 detect, model_info = st.tabs(["Detection", "Model Information"])
 
-# Function to check for helmet detections and play sound at set intervals
-def check_helmet_detections(results):
-    detected_helmets = sum(
-        1 for detection in results[0].boxes if detection.conf[0].item() > 0.5
-    )
+def check_detections(results):
+    """Triggers sound only for newly detected classes."""
+    detected_classes = set()
+    
+    for detection in results[0].boxes:
+        confidence = detection.conf[0].item()
+        class_index = int(detection.cls[0].item())
+        class_name = model.names[class_index]
 
-    if detected_helmets > 0:
-        play_sound()  # Play sound with cooldown
+        print(f"📸 Detected: {class_name}, Confidence: {confidence}")
 
-# Function to process image
+        if confidence > 0.2 and class_name in SOUND_FILES:
+            detected_classes.add(class_name)
+
+    # Play sound for newly detected classes
+    new_detections = detected_classes - st.session_state.last_detected_classes
+    for class_name in new_detections:
+        play_sound(class_name)
+
+    st.session_state.last_detected_classes = detected_classes  # Update session state
+
 def process_image(image):
+    """Processes an image for object detection."""
     image = np.array(image)
-    results = model(image, verbose=False)
-    check_helmet_detections(results)
-    detected_img = results[0].plot(conf=True)
-    return cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+    
+    # Convert RGB image (PIL) to BGR (OpenCV format)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-# Function to process video
+    results = model(image, verbose=False)
+
+    check_detections(results)
+
+    detected_img = results[0].plot(conf=True)
+    
+    # Convert back to RGB for correct display
+    return cv2.cvtColor(np.array(detected_img, dtype=np.uint8), cv2.COLOR_BGR2RGB)  
+
 def process_video(video_path):
+    """Processes video frames for object detection."""
     cap = cv2.VideoCapture(video_path)
     stframe = st.empty()
 
@@ -115,12 +177,12 @@ def process_video(video_path):
             break
 
         results = model(frame, verbose=False)
-        check_helmet_detections(results)  # Play sound at intervals (not every frame)
+        check_detections(results)
 
         detected_frame = results[0].plot(conf=True)
-        detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+        detected_frame = cv2.cvtColor(np.array(detected_frame, dtype=np.uint8), cv2.COLOR_BGR2RGB)
 
-        stframe.image(detected_frame, channels="BGR", use_container_width=True)
+        stframe.image(detected_frame, channels="RGB", use_container_width=True)
 
     cap.release()
     cv2.destroyAllWindows()
@@ -128,12 +190,17 @@ def process_video(video_path):
 # File uploader
 uploaded_file = st.sidebar.file_uploader("Upload Image/Video", type=["jpg", "jpeg", "png", "mp4", "avi", "mov"])
 
+# Detection functionality
 with detect:
     if uploaded_file:
+        # Detect new upload and reset sound tracking
+        if new_upload_detected():
+            st.session_state.last_detected_classes.clear()
+
         file_type = uploaded_file.type.split("/")[0]
 
         if file_type == "image":
-            image = Image.open(uploaded_file)
+            image = Image.open(uploaded_file).convert("RGB")  # Ensure proper color format
             with st.spinner("Processing image..."):
                 detected_img = process_image(image)
             st.image(detected_img, caption="Detected Image", use_container_width=True)
